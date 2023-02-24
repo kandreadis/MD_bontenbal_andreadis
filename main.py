@@ -14,7 +14,7 @@ Ag_m = 6.6335209e-26  # [kg]  Atomic mass of Argon
 # Simulation parameters:
 N_particles = 3 ** 3  # [-]   Amount of particles
 h = 0.01  # [-]   Time step
-N_time = 200  # [-]   Number of time steps
+N_time = 100  # [-]   Number of time steps
 box_L = 30  # [-]   *sigma Length of box
 # grid (0), random distribution (1), two particles (2)
 test_state = 0
@@ -41,21 +41,22 @@ def mic(x1, x2, y1, y2, z1, z2):
     convention is applied, returning the closest x,y,z coordinates."""
     x_close, y_close, z_close = x2, y2, z2
 
-    x_close = (x2 - x1 + box_L / 2) % box_L - box_L / 2
-    y_close = (y2 - y1 + box_L / 2) % box_L - box_L / 2
-    z_close = (z2 - z1 + box_L / 2) % box_L - box_L / 2
-    # if x2 - x1 > box_L / 2:
-    #     x_close = x2 - box_L
-    # if x2 - x1 <= -box_L / 2:
-    #     x_close = x2 + box_L
-    # if y2 - y1 > box_L / 2:
-    #     y_close = y2 - box_L
-    # if y2 - y1 <= -box_L / 2:
-    #     y_close = y2 + box_L
-    # if z2 - z1 > box_L / 2:
-    #     z_close = z2 - box_L
-    # if z2 - z1 <= -box_L / 2:
-    #     z_close = z2 + box_L
+    # test_x_close = (x2 - x1 + box_L / 2) % box_L - box_L / 2
+    # test_y_close = (y2 - y1 + box_L / 2) % box_L - box_L / 2
+    # test_z_close = (z2 - z1 + box_L / 2) % box_L - box_L / 2
+
+    if x2 - x1 > box_L / 2:
+        x_close = x2 - box_L
+    elif x2 - x1 <= -box_L / 2:
+        x_close = x2 + box_L
+    if y2 - y1 > box_L / 2:
+        y_close = y2 - box_L
+    elif y2 - y1 <= -box_L / 2:
+        y_close = y2 + box_L
+    if z2 - z1 > box_L / 2:
+        z_close = z2 - box_L
+    elif z2 - z1 <= -box_L / 2:
+        z_close = z2 + box_L
     return x_close, y_close, z_close
 
 
