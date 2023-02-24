@@ -11,7 +11,7 @@ radius_max = 3  # [-]   *sigma Lennard-Jones Potential cutoff max radius of inte
 Ag_m = 6.6335209e-26  # [kg]  Atomic mass of Argon
 
 # Simulation parameters:
-N_particles = 5 ** 3  # [-]   Amount of particles
+N_particles = 3 ** 3  # [-]   Amount of particles
 h = 0.01  # [-]   Time step
 N_time = 200  # [-]   Number of time steps
 box_L = 100  # [-]   *sigma Length of box
