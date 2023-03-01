@@ -220,8 +220,7 @@ def update(i):
     return scatter, iteration,
 
 
-anim = animation.FuncAnimation(fig, update, frames=N_time)  # , interval=500)
+anim = animation.FuncAnimation(fig, update, frames=N_time, interval=10)  # , interval=500)
 anim.save('MD_simulation.gif', writer='Pillow', fps=30)
-plt.close()
-
+plt.show()
 plot_kinetic_energy(particles_simulation)
