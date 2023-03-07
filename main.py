@@ -8,14 +8,17 @@ kB = 1.380649e-23  # [J/K] Boltzmann constant
 
 epsilon = T * kB  # [J]   Lennard-Jones Potential well depth of Argon
 sigma = 3.405e-10  # [m]   Lennard-Jones Potential well depth of Argon
-radius_max = 3  # [-]   *sigma Lennard-Jones Potential cutoff max radius of interaction
+# radius_max = 10000  # [-]   *sigma Lennard-Jones Potential cutoff max radius of interaction
 Ag_m = 6.6335209e-26  # [kg]  Atomic mass of Argon
 
+
 # Simulation parameters:
-N_particles = 4 ** 3  # [-]   Amount of particles
+N_particles = 2  # [-]   Amount of particles
 h = 0.01  # [-]   Time step
-N_time = 200  # [-]   Number of time steps
-box_L = 20  # [-]   *sigma Length of box
+N_time = 240  # [-]   Number of time steps
+box_L = 200  # [-]   *sigma Length of box
+
+potential_energies = np.zeros(N_time)
 
 # grid (0), random distribution (1), two particles (2)
 if N_particles == 2:
@@ -29,6 +32,10 @@ def lj_force(r):
     this returns the unitless Lennard Jones Force. """
     force = -4 * (-12 * (r ** -14) + 6 * (r ** -8))
     return force
+
+
+def potential_energy(r):
+    return -4 * (r ** -12 - r ** -6)
 
 
 def direction(r_abs, x1, x2, y1, y2, z1, z2):
@@ -119,10 +126,10 @@ def initialize_particles():
         return particles
 
     if test_state == 2:
-        particles[0, 0, 0], particles[0, 0, 1] = [box_L / 2 + 0.5, box_L / 2]
-        particles[0, 1, 0], particles[0, 1, 1] = [box_L / 2 - 0.5, box_L / 2]
-        particles[0, 0, 3], particles[0, 0, 4] = [0, 0]
-        particles[0, 1, 3], particles[0, 1, 4] = [0, 0]
+        particles[0, 0, 0], particles[0, 0, 1] = [box_L / 2 + box_L / 4, box_L / 2] #+ box_L / 600]
+        particles[0, 1, 0], particles[0, 1, 1] = [box_L / 2 - box_L / 4, box_L / 2] #- box_L / 600]
+        particles[0, 0, 3], particles[0, 0, 4] = [-box_L/10, 0]
+        particles[0, 1, 3], particles[0, 1, 4] = [box_L/10, 0]
         return particles
 
 
@@ -133,7 +140,8 @@ def interaction_force(i, j, particles):
     f_x, f_y, f_z = [0, 0, 0]
     for k in range(N_particles):
         radius = distance(x_old, particles[i - 1][k][0], y_old, particles[i - 1][k][1], z_old, particles[i - 1][k][2])
-        if (k != j) and (radius <= radius_max) and (radius != 0):
+        if (k != j) and (radius != 0):
+            potential_energies[i] += potential_energy(radius)/2
             force = lj_force(radius)
             r_unit = direction(radius, x_old, particles[i - 1][k][0], y_old, particles[i - 1][k][1], z_old,
                                particles[i - 1][k][2])
@@ -162,7 +170,7 @@ def update_velocity(i, j, particles, f_x_old, f_y_old, f_z_old):
     vx_new, vy_new, vz_new = vx_old, vy_old, vz_old
     for k in range(N_particles):
         radius = distance(x_new, particles[i][k][0], y_new, particles[i][k][1], z_new, particles[i][k][2])
-        if (k != j) and (radius <= radius_max) and (radius != 0):
+        if (k != j) and (radius != 0):
             f_new = lj_force(radius)
             r_unit = direction(radius, x_new, particles[i][k][0], y_new, particles[i][k][1], z_new, particles[i][k][2])
             # vx_new = vx_old + (h / (2 * Ag_m)) * (f_x_old + f_new * r_unit[0])
@@ -195,7 +203,7 @@ def kinetic_energy(velocities):
     """ Given the x,y,z velocities, this returns the dimensioneless kinetic energy. """
     v_x, v_y, v_z = velocities
     v_abs = np.sqrt(v_x ** 2 + v_y ** 2 + v_z ** 2)
-    return 0.5 * Ag_m * v_abs ** 2 / epsilon
+    return 0.5 * v_abs ** 2
 
 
 def plot_kinetic_energy(particles):
@@ -211,10 +219,19 @@ def plot_kinetic_energy(particles):
     plt.figure(figsize=(5, 4))
     plt.title("Total Kinetic Energy")
     plt.plot(np.arange(0, N_time), total_kinetic_energy_list)
-    # plt.xscale('log')
-    plt.yscale('log')
     plt.xlabel("time point i")
     plt.savefig("kinetic_energies.png")
+    plt.close()
+    return total_kinetic_energy_list
+
+
+def plot_potential_energy():
+    plt.figure(figsize=(5, 4))
+    plt.title("Total Potential Energy")
+    plt.plot(np.arange(0, N_time), potential_energies)
+    plt.xlabel("time")
+    plt.ylabel("potential energy")
+    plt.savefig("potential_energies.png")
     plt.close()
     return None
 
@@ -228,12 +245,12 @@ def main():
     return particles
 
 
+particles_simulation = main()
 fig = plt.figure(figsize=(3, 3), dpi=100)
 ax = plt.axes(xlim=(0, box_L), ylim=(0, box_L), zlim=(0, box_L), projection='3d')
 ax.view_init(20, 30)
-scatter = ax.scatter([], [], [], s=5)
+scatter = ax.scatter([], [], [], s=5, marker='o')
 iteration = ax.text(box_L, 0, box_L, "i=0", color="red")
-particles_simulation = main()
 
 
 def update(i):
@@ -243,6 +260,7 @@ def update(i):
 
 
 anim = animation.FuncAnimation(fig, update, frames=N_time, interval=10)
-anim.save('MD_simulation.gif', fps=30)
+anim.save('MD_simulation.gif', fps=60)
 plt.show()
 plot_kinetic_energy(particles_simulation)
+plot_potential_energy()
