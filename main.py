@@ -11,12 +11,11 @@ sigma = 3.405e-10  # [m]   Lennard-Jones Potential well depth of Argon
 # radius_max = 10000  # [-]   *sigma Lennard-Jones Potential cutoff max radius of interaction
 Ag_m = 6.6335209e-26  # [kg]  Atomic mass of Argon
 
-
 # Simulation parameters:
-N_particles = 2  # [-]   Amount of particles
+N_particles = 2**3 #2  # [-]   Amount of particles
 h = 0.01  # [-]   Time step
-N_time = 240  # [-]   Number of time steps
-box_L = 200  # [-]   *sigma Length of box
+N_time = 500  # [-]   Number of time steps
+box_L = 30  # [-]   *sigma Length of box
 
 potential_energies = np.zeros(N_time)
 
@@ -41,9 +40,9 @@ def potential_energy(r):
 def direction(r_abs, x1, x2, y1, y2, z1, z2):
     """ Given the absolute relative distance and x,y,z coordinates
     of two particles, this returns the unit directional vector. """
-    r_x = (x2 - x1) / r_abs
-    r_y = (y2 - y1) / r_abs
-    r_z = (z2 - z1) / r_abs
+    r_x = (x1 - x2) / r_abs
+    r_y = (y1 - y2) / r_abs
+    r_z = (z1 - z2) / r_abs
     return r_x, r_y, r_z
 
 
@@ -52,22 +51,22 @@ def mic(x1, x2, y1, y2, z1, z2):
     convention is applied, returning the closest x,y,z coordinates."""
     x_close, y_close, z_close = x2, y2, z2
 
-    if x2 - x1 > box_L / 2:
-        x_close = x2 - box_L
-    elif x2 - x1 <= -box_L / 2:
-        x_close = x2 + box_L
-    if y2 - y1 > box_L / 2:
-        y_close = y2 - box_L
-    elif y2 - y1 <= -box_L / 2:
-        y_close = y2 + box_L
-    if z2 - z1 > box_L / 2:
-        z_close = z2 - box_L
-    elif z2 - z1 <= -box_L / 2:
-        z_close = z2 + box_L
+    # if x2 - x1 > box_L / 2:
+    #     x_close = x2 - box_L
+    # elif x2 - x1 <= -box_L / 2:
+    #     x_close = x2 + box_L
+    # if y2 - y1 > box_L / 2:
+    #     y_close = y2 - box_L
+    # elif y2 - y1 <= -box_L / 2:
+    #     y_close = y2 + box_L
+    # if z2 - z1 > box_L / 2:
+    #     z_close = z2 - box_L
+    # elif z2 - z1 <= -box_L / 2:
+    #     z_close = z2 + box_L
 
-    # x_close = (x2 - x1 + box_L / 2) % box_L - box_L / 2
-    # y_close = (y2 - y1 + box_L / 2) % box_L - box_L / 2
-    # z_close = (z2 - z1 + box_L / 2) % box_L - box_L / 2
+    x_close = x1+((x2 - x1 + box_L / 2) % box_L - box_L / 2)
+    y_close = y1+((y2 - y1 + box_L / 2) % box_L - box_L / 2)
+    z_close = z1+((z2 - z1 + box_L / 2) % box_L - box_L / 2)
     return x_close, y_close, z_close
 
 
@@ -104,8 +103,8 @@ def initialize_particles():
     print("shape of matrix:", particles.shape, "= (t, N, [x y z vx vy vz])")
 
     if test_state == 0:
-        grid_left_boundary = box_L / 2 - 0.4
-        grid_right_boundary = box_L / 2 + 0.3
+        grid_left_boundary = box_L / 2 - 1
+        grid_right_boundary = box_L / 2 + 1
         box_grid = np.linspace(grid_left_boundary, grid_right_boundary, num=round(N_particles ** (1 / 3)))
         x_grid, y_grid, z_grid = np.meshgrid(box_grid, box_grid, box_grid)
         particles[0, :, 0] = np.matrix.flatten(x_grid)
@@ -126,27 +125,28 @@ def initialize_particles():
         return particles
 
     if test_state == 2:
-        particles[0, 0, 0], particles[0, 0, 1] = [box_L / 2 + box_L / 4, box_L / 2] #+ box_L / 600]
-        particles[0, 1, 0], particles[0, 1, 1] = [box_L / 2 - box_L / 4, box_L / 2] #- box_L / 600]
-        particles[0, 0, 3], particles[0, 0, 4] = [-box_L/10, 0]
-        particles[0, 1, 3], particles[0, 1, 4] = [box_L/10, 0]
+        particles[0, 0, 0], particles[0, 0, 1] = [box_L / 2 + 1, box_L / 2]  # + box_L / 600]
+        particles[0, 1, 0], particles[0, 1, 1] = [box_L / 2 - 2, box_L / 2]  # - box_L / 600]
+        particles[0, 0, 3], particles[0, 0, 4] = [-20, 0]
+        particles[0, 1, 3], particles[0, 1, 4] = [20, 0]
         return particles
 
 
 def interaction_force(i, j, particles):
     """ Given the time index i, particle index j, and particle state,
-        this returns the new x,y,z Force components."""
+        this returns the old x,y,z Force components."""
     x_old, y_old, z_old, vx_old, vy_old, vz_old = particles[i - 1][j]
     f_x, f_y, f_z = [0, 0, 0]
     for k in range(N_particles):
         radius = distance(x_old, particles[i - 1][k][0], y_old, particles[i - 1][k][1], z_old, particles[i - 1][k][2])
         if (k != j) and (radius != 0):
-            potential_energies[i] += potential_energy(radius)/2
+            potential_energies[i] += potential_energy(radius) / 2
             force = lj_force(radius)
             r_unit = direction(radius, x_old, particles[i - 1][k][0], y_old, particles[i - 1][k][1], z_old,
                                particles[i - 1][k][2])
-            f_x, f_y, f_z = force * r_unit[0], force * r_unit[1], force * r_unit[2]
-
+            f_x += force * r_unit[0]
+            f_y += force * r_unit[1]
+            f_z += force * r_unit[2]
     return f_x, f_y, f_z
 
 
@@ -168,34 +168,33 @@ def update_velocity(i, j, particles, f_x_old, f_y_old, f_z_old):
     x_old, y_old, z_old, vx_old, vy_old, vz_old = particles[i - 1][j]
     x_new, y_new, z_new, vx_new, vy_new, vz_new = particles[i][j]
     vx_new, vy_new, vz_new = vx_old, vy_old, vz_old
+    f_x, f_y, f_z = [0, 0, 0]
     for k in range(N_particles):
         radius = distance(x_new, particles[i][k][0], y_new, particles[i][k][1], z_new, particles[i][k][2])
         if (k != j) and (radius != 0):
-            f_new = lj_force(radius)
+            force = lj_force(radius)
             r_unit = direction(radius, x_new, particles[i][k][0], y_new, particles[i][k][1], z_new, particles[i][k][2])
-            # vx_new = vx_old + (h / (2 * Ag_m)) * (f_x_old + f_new * r_unit[0])
-            vx_new = vx_old + (h / 2) * (f_x_old + f_new * r_unit[0])
-            vy_new = vy_old + (h / 2) * (f_y_old + f_new * r_unit[1])
-            vz_new = vz_old + (h / 2) * (f_z_old + f_new * r_unit[2])
+            f_x += force * r_unit[0]
+            f_y += force * r_unit[1]
+            f_z += force * r_unit[2]
+
+    vx_new = vx_old + (h / 2) * (f_x_old + f_x)
+    vy_new = vy_old + (h / 2) * (f_y_old + f_y)
+    vz_new = vz_old + (h / 2) * (f_z_old + f_z)
     return vx_new, vy_new, vz_new
-
-
-def update_single_particle(i, j, particles):
-    """ Given the time index i, particle index j, and particle state,
-    this returns the new x,y,z coordinates based on Newtonian dynamics and the Verlet algorithm."""
-    f_x, f_y, f_z = interaction_force(i, j, particles)
-    x_new, y_new, z_new = update_position(i, j, particles, f_x, f_y, f_z)
-    particles[i][j][0:3] = [x_new, y_new, z_new]
-    vx_new, vy_new, vz_new = update_velocity(i, j, particles, f_x, f_y, f_z)
-    particles[i][j][3:6] = [vx_new, vy_new, vz_new]
-
-    return particles
 
 
 def update_particles(i, particles):
     """ This function updates all particles. """
     for j in range(N_particles):
-        particles = update_single_particle(i, j, particles)
+        for k in range(N_particles):
+            f_x, f_y, f_z = interaction_force(i, k, particles)
+            x_new, y_new, z_new = update_position(i, k, particles, f_x, f_y, f_z)
+            particles[i][k][0:3] = [x_new, y_new, z_new]
+        f_x, f_y, f_z = interaction_force(i, j, particles)
+        vx_new, vy_new, vz_new = update_velocity(i, j, particles, f_x, f_y, f_z)
+        particles[i][j][3:6] = [vx_new, vy_new, vz_new]
+
     return particles
 
 
@@ -259,8 +258,9 @@ def update(i):
     return scatter, iteration,
 
 
-anim = animation.FuncAnimation(fig, update, frames=N_time, interval=10)
+anim = animation.FuncAnimation(fig, update, frames=N_time, interval=2)
 anim.save('MD_simulation.gif', fps=60)
 plt.show()
+
 plot_kinetic_energy(particles_simulation)
 plot_potential_energy()
