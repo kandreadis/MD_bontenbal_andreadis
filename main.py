@@ -12,9 +12,9 @@ sigma = 3.405e-10  # [m]   Lennard-Jones Potential well depth of Argon
 Ag_m = 6.6335209e-26  # [kg]  Atomic mass of Argon
 
 # Simulation parameters:
-N_particles = 2**3 #2  # [-]   Amount of particles
-h = 0.01  # [-]   Time step
-N_time = 500  # [-]   Number of time steps
+N_particles = 2  # [-]   Amount of particles
+h = 0.001  # [-]   Time step
+N_time = 1000  # [-]   Number of time steps
 box_L = 30  # [-]   *sigma Length of box
 
 potential_energies = np.zeros(N_time)
@@ -26,76 +26,6 @@ else:
     test_state = 0
 
 
-def lj_force(r):
-    """ Given the unitless radius between two particles,
-    this returns the unitless Lennard Jones Force. """
-    force = -4 * (-12 * (r ** -14) + 6 * (r ** -8))
-    return force
-
-
-def potential_energy(r):
-    return -4 * (r ** -12 - r ** -6)
-
-
-def direction(r_abs, x1, x2, y1, y2, z1, z2):
-    """ Given the absolute relative distance and x,y,z coordinates
-    of two particles, this returns the unit directional vector. """
-    r_x = (x1 - x2) / r_abs
-    r_y = (y1 - y2) / r_abs
-    r_z = (z1 - z2) / r_abs
-    return r_x, r_y, r_z
-
-
-def mic(x1, x2, y1, y2, z1, z2):
-    """ Given the x,y,z coordinates of two particles, the minimum image
-    convention is applied, returning the closest x,y,z coordinates."""
-    x_close, y_close, z_close = x2, y2, z2
-
-    # if x2 - x1 > box_L / 2:
-    #     x_close = x2 - box_L
-    # elif x2 - x1 <= -box_L / 2:
-    #     x_close = x2 + box_L
-    # if y2 - y1 > box_L / 2:
-    #     y_close = y2 - box_L
-    # elif y2 - y1 <= -box_L / 2:
-    #     y_close = y2 + box_L
-    # if z2 - z1 > box_L / 2:
-    #     z_close = z2 - box_L
-    # elif z2 - z1 <= -box_L / 2:
-    #     z_close = z2 + box_L
-
-    x_close = x1+((x2 - x1 + box_L / 2) % box_L - box_L / 2)
-    y_close = y1+((y2 - y1 + box_L / 2) % box_L - box_L / 2)
-    z_close = z1+((z2 - z1 + box_L / 2) % box_L - box_L / 2)
-    return x_close, y_close, z_close
-
-
-def distance(x1, x2, y1, y2, z1, z2):
-    """ Given the x,y,z coordinates of two particles, this returns the
-    absolute distance to the closest partner on the infinite canvas."""
-    x2, y2, z2 = mic(x1, x2, y1, y2, z1, z2)
-    r_abs = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2 + (z2 - z1) ** 2)
-    return r_abs
-
-
-def periodicity_warp(x_new, y_new, z_new):
-    """ Given the updated x,y,z coordinates of a particle, this applies
-    periodic boundary conditions, returning the new warped coordinates."""
-    if x_new >= box_L:
-        x_new = x_new % box_L
-    if x_new < 0:
-        x_new = box_L - (abs(x_new) % box_L)
-    if y_new >= box_L:
-        y_new = y_new % box_L
-    if y_new < 0:
-        y_new = box_L - (abs(y_new) % box_L)
-    if z_new >= box_L:
-        z_new = z_new % box_L
-    if z_new < 0:
-        z_new = box_L - (abs(z_new) % box_L)
-    return x_new, y_new, z_new
-
-
 def initialize_particles():
     """ This function returns the initial particle state at t=0. The particle
     state contains for each timestep 6 columns (x,y,z,v_x,v_y,v_z) and N rows. """
@@ -103,7 +33,7 @@ def initialize_particles():
     print("shape of matrix:", particles.shape, "= (t, N, [x y z vx vy vz])")
 
     if test_state == 0:
-        grid_left_boundary = box_L / 2 - 1
+        grid_left_boundary = box_L / 2 - 0.8
         grid_right_boundary = box_L / 2 + 1
         box_grid = np.linspace(grid_left_boundary, grid_right_boundary, num=round(N_particles ** (1 / 3)))
         x_grid, y_grid, z_grid = np.meshgrid(box_grid, box_grid, box_grid)
@@ -125,11 +55,81 @@ def initialize_particles():
         return particles
 
     if test_state == 2:
-        particles[0, 0, 0], particles[0, 0, 1] = [box_L / 2 + 1, box_L / 2]  # + box_L / 600]
-        particles[0, 1, 0], particles[0, 1, 1] = [box_L / 2 - 2, box_L / 2]  # - box_L / 600]
-        particles[0, 0, 3], particles[0, 0, 4] = [-20, 0]
-        particles[0, 1, 3], particles[0, 1, 4] = [20, 0]
+        v_init_two_particles = 10
+        particles[0, 0, 0], particles[0, 0, 1] = [box_L / 2 + 3, box_L / 2 + 1]  # + box_L / 600]
+        particles[0, 1, 0], particles[0, 1, 1] = [box_L / 2 - 3, box_L / 2 - 1]  # - box_L / 600]
+        particles[0, 0, 3], particles[0, 0, 4] = [-v_init_two_particles, 0]
+        particles[0, 1, 3], particles[0, 1, 4] = [v_init_two_particles, 0]
         return particles
+
+
+def lj_force(r):
+    """ Given the unitless radius between two particles,
+    this returns the unitless Lennard Jones Force. """
+    force = -4 * (-12 * (r ** -14) + 6 * (r ** -8))
+    return force
+
+
+def potential_energy(r):
+    potential = 4 * (r ** -12 - r ** -6)
+    return potential
+
+
+def mic(x1, x2, y1, y2, z1, z2):
+    """ Given the x,y,z coordinates of two particles, the minimum image
+    convention is applied, returning the closest x,y,z coordinates."""
+    # x_close, y_close, z_close = x2, y2, z2
+    # if x2 - x1 > box_L / 2:
+    #     x_close = x2 - box_L
+    # elif x2 - x1 <= -box_L / 2:
+    #     x_close = x2 + box_L
+    # if y2 - y1 > box_L / 2:
+    #     y_close = y2 - box_L
+    # elif y2 - y1 <= -box_L / 2:
+    #     y_close = y2 + box_L
+    # if z2 - z1 > box_L / 2:
+    #     z_close = z2 - box_L
+    # elif z2 - z1 <= -box_L / 2:
+    #     z_close = z2 + box_L
+    x_close = x1 + ((x2 - x1 + box_L / 2) % box_L - box_L / 2)
+    y_close = y1 + ((y2 - y1 + box_L / 2) % box_L - box_L / 2)
+    z_close = z1 + ((z2 - z1 + box_L / 2) % box_L - box_L / 2)
+    return x_close, y_close, z_close
+
+
+def abs_distance(x1, x2, y1, y2, z1, z2):
+    """ Given the x,y,z coordinates of two particles, this returns the
+    absolute distance to the closest partner on the infinite canvas."""
+    x2, y2, z2 = mic(x1, x2, y1, y2, z1, z2)
+    r_abs = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2 + (z2 - z1) ** 2)
+    return r_abs
+
+
+def unit_direction(r_abs, x1, x2, y1, y2, z1, z2):
+    """ Given the absolute relative distance and x,y,z coordinates
+    of two particles, this returns the unit directional vector. """
+    r_x = (x1 - x2) / r_abs
+    r_y = (y1 - y2) / r_abs
+    r_z = (z1 - z2) / r_abs
+    return r_x, r_y, r_z
+
+
+def periodicity_warp(x_new, y_new, z_new):
+    """ Given the updated x,y,z coordinates of a particle, this applies
+    periodic boundary conditions, returning the new warped coordinates."""
+    if x_new >= box_L:
+        x_new = x_new % box_L
+    if x_new < 0:
+        x_new = box_L - (abs(x_new) % box_L)
+    if y_new >= box_L:
+        y_new = y_new % box_L
+    if y_new < 0:
+        y_new = box_L - (abs(y_new) % box_L)
+    if z_new >= box_L:
+        z_new = z_new % box_L
+    if z_new < 0:
+        z_new = box_L - (abs(z_new) % box_L)
+    return x_new, y_new, z_new
 
 
 def interaction_force(i, j, particles):
@@ -138,12 +138,12 @@ def interaction_force(i, j, particles):
     x_old, y_old, z_old, vx_old, vy_old, vz_old = particles[i - 1][j]
     f_x, f_y, f_z = [0, 0, 0]
     for k in range(N_particles):
-        radius = distance(x_old, particles[i - 1][k][0], y_old, particles[i - 1][k][1], z_old, particles[i - 1][k][2])
+        radius = abs_distance(x_old, particles[i - 1][k][0], y_old, particles[i - 1][k][1], z_old,
+                              particles[i - 1][k][2])
         if (k != j) and (radius != 0):
-            potential_energies[i] += potential_energy(radius) / 2
             force = lj_force(radius)
-            r_unit = direction(radius, x_old, particles[i - 1][k][0], y_old, particles[i - 1][k][1], z_old,
-                               particles[i - 1][k][2])
+            r_unit = unit_direction(radius, x_old, particles[i - 1][k][0], y_old, particles[i - 1][k][1], z_old,
+                                    particles[i - 1][k][2])
             f_x += force * r_unit[0]
             f_y += force * r_unit[1]
             f_z += force * r_unit[2]
@@ -167,13 +167,15 @@ def update_velocity(i, j, particles, f_x_old, f_y_old, f_z_old):
     this returns the new x,y,z velocities based on Newtonian dynamics and the Verlet algorithm."""
     x_old, y_old, z_old, vx_old, vy_old, vz_old = particles[i - 1][j]
     x_new, y_new, z_new, vx_new, vy_new, vz_new = particles[i][j]
-    vx_new, vy_new, vz_new = vx_old, vy_old, vz_old
     f_x, f_y, f_z = [0, 0, 0]
+
     for k in range(N_particles):
-        radius = distance(x_new, particles[i][k][0], y_new, particles[i][k][1], z_new, particles[i][k][2])
+        radius = abs_distance(x_new, particles[i][k][0], y_new, particles[i][k][1], z_new, particles[i][k][2])
         if (k != j) and (radius != 0):
+            potential_energies[i] += potential_energy(radius)
             force = lj_force(radius)
-            r_unit = direction(radius, x_new, particles[i][k][0], y_new, particles[i][k][1], z_new, particles[i][k][2])
+            r_unit = unit_direction(radius, x_new, particles[i][k][0], y_new, particles[i][k][1], z_new,
+                                    particles[i][k][2])
             f_x += force * r_unit[0]
             f_y += force * r_unit[1]
             f_z += force * r_unit[2]
@@ -207,21 +209,20 @@ def kinetic_energy(velocities):
 
 def plot_kinetic_energy(particles):
     """ Given the particle state, this plots the kinetic energy. """
-    total_kinetic_energy_list = []
-    for particles_t in particles:
-        total_kinetic_energy = 0
-        for particle_t in particles_t:
-            # print(particle_t)
-            total_kinetic_energy += kinetic_energy(particle_t[3:])
-        total_kinetic_energy_list.append(total_kinetic_energy)
+    total_kinetic_energies = np.zeros(N_time)
+    for i in range(N_time):
+        energy_kin = 0
+        for j in range(N_particles):
+            energy_kin += kinetic_energy(particles[i, j, 3:])
+        total_kinetic_energies[i] = energy_kin
 
     plt.figure(figsize=(5, 4))
     plt.title("Total Kinetic Energy")
-    plt.plot(np.arange(0, N_time), total_kinetic_energy_list)
+    plt.plot(np.arange(0, N_time), total_kinetic_energies)
     plt.xlabel("time point i")
     plt.savefig("kinetic_energies.png")
     plt.close()
-    return total_kinetic_energy_list
+    return total_kinetic_energies
 
 
 def plot_potential_energy():
@@ -235,6 +236,52 @@ def plot_potential_energy():
     return None
 
 
+def plot_total_energy(particles):
+    plt.figure(figsize=(5, 4))
+    plt.title("Total Potential Energy")
+    kin_en = plot_kinetic_energy(particles)
+    plt.plot(np.arange(0, N_time), potential_energies, label="potential")
+    plt.plot(np.arange(0, N_time), kin_en - np.average(kin_en),
+             label="kinetic - $E_{kin, avg}$")
+    # plt.plot(np.arange(0, N_time), potential_energies+total_kinetic_energy_list, label="total")
+    plt.xlabel("time")
+    plt.ylabel("energy")
+    plt.legend()
+    plt.savefig("total_energies.png")
+    plt.close()
+    return None
+
+
+def plot_z_slice(particles):
+    plt.figure()
+    plt.title("z = 0 projection")
+    plt.plot(particles[:, 0, 0], particles[:, 0, 1], "o-", markersize=1, c="b")
+    plt.plot(particles[:, 1, 0], particles[:, 1, 1], "o-", markersize=1, c="r")
+    plt.plot(particles[0, 0, 0], particles[0, 0, 1], "s", markersize=10, c="b")
+    plt.plot(particles[0, 1, 0], particles[0, 1, 1], "s", markersize=10, c="r")
+    plt.xlim(0, box_L)
+    plt.ylim(0, box_L)
+    plt.show()
+
+
+def generate_gif(particles):
+    fig = plt.figure(figsize=(3, 3), dpi=100)
+    ax = plt.axes(xlim=(0, box_L), ylim=(0, box_L), zlim=(0, box_L), projection='3d')
+    ax.view_init(20, 30)
+    scatter = ax.scatter([], [], [], s=5, marker='o')
+    iteration = ax.text(box_L, 0, box_L, "i=0", color="red")
+
+    def update(i):
+        scatter._offsets3d = (particles[i, :, 0], particles[i, :, 1], particles[i, :, 2])
+        iteration.set_text("i=" + str(i))
+        return scatter, iteration,
+
+    anim = animation.FuncAnimation(fig, update, frames=N_time, interval=1)
+    anim.save('MD_simulation.gif', fps=80)
+    plt.show()
+    # plt.close()
+
+
 def main():
     """ Main function to be run for this code. """
     particles = initialize_particles()
@@ -245,22 +292,13 @@ def main():
 
 
 particles_simulation = main()
-fig = plt.figure(figsize=(3, 3), dpi=100)
-ax = plt.axes(xlim=(0, box_L), ylim=(0, box_L), zlim=(0, box_L), projection='3d')
-ax.view_init(20, 30)
-scatter = ax.scatter([], [], [], s=5, marker='o')
-iteration = ax.text(box_L, 0, box_L, "i=0", color="red")
 
-
-def update(i):
-    scatter._offsets3d = (particles_simulation[i, :, 0], particles_simulation[i, :, 1], particles_simulation[i, :, 2])
-    iteration.set_text("i=" + str(i))
-    return scatter, iteration,
-
-
-anim = animation.FuncAnimation(fig, update, frames=N_time, interval=2)
-anim.save('MD_simulation.gif', fps=60)
-plt.show()
-
-plot_kinetic_energy(particles_simulation)
 plot_potential_energy()
+plot_kinetic_energy(particles_simulation)
+plot_total_energy(particles_simulation)
+if N_particles == 2:
+    plot_z_slice(particles_simulation)
+else:
+    generate_gif(particles_simulation)
+
+# generate_gif(particles_simulation)
