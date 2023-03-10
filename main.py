@@ -6,24 +6,31 @@ from matplotlib import animation
 T = 119.8  # [K]   Temperature of system
 kB = 1.380649e-23  # [J/K] Boltzmann constant
 
-epsilon = T * kB  # [J]   Lennard-Jones Potential well depth of Argon
+# rho = 0.3  T = 3.0 gas
+# rho = 0.8  T = 1.0 liquid
+# rho = 1.2  T = 0.5 solid
+rho = 1.2
+temperature = 0.5
+
+# epsilon = T * kB  # [J]   Lennard-Jones Potential well depth of Argon
 sigma = 3.405e-10  # [m]   Lennard-Jones Potential well depth of Argon
 # radius_max = 10000  # [-]   *sigma Lennard-Jones Potential cutoff max radius of interaction
 Ag_m = 6.6335209e-26  # [kg]  Atomic mass of Argon
 
 # Simulation parameters:
-N_particles = 2  # [-]   Amount of particles
-h = 0.001  # [-]   Time step
-N_time = 1000  # [-]   Number of time steps
-box_L = 30  # [-]   *sigma Length of box
+N_particles = 108  # [-]   Amount of particles
+h = 0.01  # [-]   Time step
+N_time = 300  # [-]   Number of time steps
 
+box_L = np.power(N_particles * Ag_m / (sigma ** 3 * rho), 1 / 3)  # [-]   *sigma Length of box
+print("Length of box:", box_L)
 potential_energies = np.zeros(N_time)
 
 # grid (0), random distribution (1), two particles (2)
 if N_particles == 2:
     test_state = 2
 else:
-    test_state = 0
+    test_state = "fcc"
 
 
 def initialize_particles():
@@ -33,33 +40,58 @@ def initialize_particles():
     print("shape of matrix:", particles.shape, "= (t, N, [x y z vx vy vz])")
 
     if test_state == 0:
-        grid_left_boundary = box_L / 2 - 0.8
+        grid_left_boundary = box_L / 2 - 1
         grid_right_boundary = box_L / 2 + 1
         box_grid = np.linspace(grid_left_boundary, grid_right_boundary, num=round(N_particles ** (1 / 3)))
         x_grid, y_grid, z_grid = np.meshgrid(box_grid, box_grid, box_grid)
         particles[0, :, 0] = np.matrix.flatten(x_grid)
         particles[0, :, 1] = np.matrix.flatten(y_grid)
         particles[0, :, 2] = np.matrix.flatten(z_grid)
-        particles[0, :, 3] = 0  # 1/h
-        particles[0, :, 4] = 0  # 1/h
-        particles[0, :, 5] = 0  # 1/h
+        # particles[0, :, 3] = 0  # 1/h
+        # particles[0, :, 4] = 0  # 1/h
+        # particles[0, :, 5] = 0  # 1/h
         return particles
 
     if test_state == 1:
-        np.random.seed(0)
-        random_left_boundary = box_L / 2 - 1
-        random_right_boundary = box_L / 2 + 1
+        # np.random.seed(0)
+        random_left_boundary = box_L / 2 - 2
+        random_right_boundary = box_L / 2 + 2
         particles[0, :, 0] = np.random.uniform(random_left_boundary, random_right_boundary, size=N_particles)
         particles[0, :, 1] = np.random.uniform(random_left_boundary, random_right_boundary, size=N_particles)
         particles[0, :, 2] = np.random.uniform(random_left_boundary, random_right_boundary, size=N_particles)
         return particles
 
     if test_state == 2:
-        v_init_two_particles = 10
+        v_init_two_particles = (1 / h) / 100
         particles[0, 0, 0], particles[0, 0, 1] = [box_L / 2 + 3, box_L / 2 + 1]  # + box_L / 600]
-        particles[0, 1, 0], particles[0, 1, 1] = [box_L / 2 - 3, box_L / 2 - 1]  # - box_L / 600]
+        particles[0, 1, 0], particles[0, 1, 1] = [box_L / 2 - 3, box_L / 2 - 0.5]  # - box_L / 600]
         particles[0, 0, 3], particles[0, 0, 4] = [-v_init_two_particles, 0]
         particles[0, 1, 3], particles[0, 1, 4] = [v_init_two_particles, 0]
+        return particles
+
+    if test_state == "fcc":
+        counter = 0
+        for n1 in range(3):
+            for n2 in range(3):
+                for n3 in range(3):
+                    lattice_displacer = np.array([n1 * box_L / 3, n2 * box_L / 3, n3 * box_L / 3])
+                    particles[0, counter, 0:3] = [0, 0, 0] + lattice_displacer
+                    counter += 1
+                    particles[0, counter, 0:3] = [box_L / 6, box_L / 6, 0] + lattice_displacer
+                    counter += 1
+                    particles[0, counter, 0:3] = [box_L / 6, 0, box_L / 6] + lattice_displacer
+                    counter += 1
+                    particles[0, counter, 0:3] = [0, box_L / 6, box_L / 6] + lattice_displacer
+                    counter += 1
+
+        for j in range(N_particles):
+            gaussian_scale = 0.00001 / h
+            # print(gaussian_scale)
+            vx_random = np.random.normal(scale=gaussian_scale)
+            vy_random = np.random.normal(scale=gaussian_scale)
+            vz_random = np.random.normal(scale=gaussian_scale)
+            # print(vx_random)
+            particles[0, j, 3:6] = [vx_random, vy_random, vz_random]
         return particles
 
 
@@ -117,15 +149,15 @@ def unit_direction(r_abs, x1, x2, y1, y2, z1, z2):
 def periodicity_warp(x_new, y_new, z_new):
     """ Given the updated x,y,z coordinates of a particle, this applies
     periodic boundary conditions, returning the new warped coordinates."""
-    if x_new >= box_L:
+    if x_new > box_L:
         x_new = x_new % box_L
     if x_new < 0:
         x_new = box_L - (abs(x_new) % box_L)
-    if y_new >= box_L:
+    if y_new > box_L:
         y_new = y_new % box_L
     if y_new < 0:
         y_new = box_L - (abs(y_new) % box_L)
-    if z_new >= box_L:
+    if z_new > box_L:
         z_new = z_new % box_L
     if z_new < 0:
         z_new = box_L - (abs(z_new) % box_L)
@@ -172,7 +204,7 @@ def update_velocity(i, j, particles, f_x_old, f_y_old, f_z_old):
     for k in range(N_particles):
         radius = abs_distance(x_new, particles[i][k][0], y_new, particles[i][k][1], z_new, particles[i][k][2])
         if (k != j) and (radius != 0):
-            potential_energies[i] += potential_energy(radius)
+            potential_energies[i] += potential_energy(radius) / N_particles
             force = lj_force(radius)
             r_unit = unit_direction(radius, x_new, particles[i][k][0], y_new, particles[i][k][1], z_new,
                                     particles[i][k][2])
@@ -185,26 +217,42 @@ def update_velocity(i, j, particles, f_x_old, f_y_old, f_z_old):
     vz_new = vz_old + (h / 2) * (f_z_old + f_z)
     return vx_new, vy_new, vz_new
 
-
-def update_particles(i, particles):
-    """ This function updates all particles. """
-    for j in range(N_particles):
-        for k in range(N_particles):
-            f_x, f_y, f_z = interaction_force(i, k, particles)
-            x_new, y_new, z_new = update_position(i, k, particles, f_x, f_y, f_z)
-            particles[i][k][0:3] = [x_new, y_new, z_new]
-        f_x, f_y, f_z = interaction_force(i, j, particles)
-        vx_new, vy_new, vz_new = update_velocity(i, j, particles, f_x, f_y, f_z)
-        particles[i][j][3:6] = [vx_new, vy_new, vz_new]
-
-    return particles
-
-
 def kinetic_energy(velocities):
     """ Given the x,y,z velocities, this returns the dimensioneless kinetic energy. """
     v_x, v_y, v_z = velocities
     v_abs = np.sqrt(v_x ** 2 + v_y ** 2 + v_z ** 2)
+    # print(v_abs)
     return 0.5 * v_abs ** 2
+
+def update_particles(i, particles):
+    """ This function updates all particles. """
+    rescaling_threshold = 5
+
+    for k in range(N_particles):
+        f_x, f_y, f_z = interaction_force(i, k, particles)
+        x_new, y_new, z_new = update_position(i, k, particles, f_x, f_y, f_z)
+        particles[i][k][0:3] = [x_new, y_new, z_new]
+
+    if i == rescaling_threshold:
+        sum_kin_en = 0
+        for j in range(N_particles):
+            sum_kin_en += 2*kinetic_energy(particles[i-1, j, 3:])
+        lambda_thermal = np.sqrt(((N_particles-1)*3*temperature)/sum_kin_en)
+        print((lambda_thermal))
+        for j in range(N_particles):
+            f_x, f_y, f_z = interaction_force(i, j, particles)
+            vx_new, vy_new, vz_new = update_velocity(i, j, particles, f_x, f_y, f_z)
+            particles[i][j][3:6] = np.multiply([vx_new, vy_new, vz_new], lambda_thermal)
+        # print(vx_new,vy_new,vz_new)
+        # print(np.multiply([vx_new, vy_new, vz_new], lambda_thermal))
+
+    else:
+        for j in range(N_particles):
+            f_x, f_y, f_z = interaction_force(i, j, particles)
+            vx_new, vy_new, vz_new = update_velocity(i, j, particles, f_x, f_y, f_z)
+            particles[i][j][3:6] = [vx_new, vy_new, vz_new]
+
+    return particles
 
 
 def plot_kinetic_energy(particles):
@@ -238,14 +286,18 @@ def plot_potential_energy():
 
 def plot_total_energy(particles):
     plt.figure(figsize=(5, 4))
-    plt.title("Total Potential Energy")
+    plt.title("Total Energy")
     kin_en = plot_kinetic_energy(particles)
-    plt.plot(np.arange(0, N_time), potential_energies, label="potential")
-    plt.plot(np.arange(0, N_time), kin_en - np.average(kin_en),
-             label="kinetic - $E_{kin, avg}$")
-    # plt.plot(np.arange(0, N_time), potential_energies+total_kinetic_energy_list, label="total")
+    # plt.plot(np.arange(1, N_time), potential_energies[1:], label="potential")
+    # plt.plot(np.arange(1, N_time), kin_en[1:] - kin_en[0],
+    #          label="kinetic - $E_{kin, avg}$")
+    # plt.plot(np.arange(1, N_time), kin_en[1:], label="kinetic")
+
+    plt.plot(np.arange(1, N_time), potential_energies[1:] + kin_en[1:], label="total")
+    # print(np.min(potential_energies) / np.max(kin_en - kin_en[0]))
     plt.xlabel("time")
     plt.ylabel("energy")
+    # plt.yscale("log")
     plt.legend()
     plt.savefig("total_energies.png")
     plt.close()
@@ -296,9 +348,8 @@ particles_simulation = main()
 plot_potential_energy()
 plot_kinetic_energy(particles_simulation)
 plot_total_energy(particles_simulation)
-if N_particles == 2:
-    plot_z_slice(particles_simulation)
-else:
-    generate_gif(particles_simulation)
-
-# generate_gif(particles_simulation)
+generate_gif(particles_simulation)
+# if N_particles == 2:
+#     plot_z_slice(particles_simulation)
+# else:
+#     generate_gif(particles_simulation)
